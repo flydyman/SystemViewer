@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+
+{% block title %}System Dashboard{% endblock %}
+
+{% block content %}
+    <!-- Summary Cards Row -->
+    <div class="row mb-4">
+        <!-- CPU Summary Card -->
+        <div class="col-md-4">
+            <div class="metric-card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="fas fa-microchip me-2"></i>CPU</h5>
+                    <span id="cpu-status" class="badge"></span>
+                </div>
+                <div class="card-body">
+                    <h2 class="mb-0" id="cpu-usage">--%</h2>
+                    <p class="text-muted">Current Usage</p>
+                    <div id="cpu-load">
+                        Load avg: <span id="load-1">--</span>, <span id="load-5">--</span>, <span id="load-15">--</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Memory Summary Card -->
+        <div class="col-md-4">
+            <div class="metric-card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="fas fa-memory me-2"></i>Memory</h5>
+                    <span id="memory-status" class="badge"></span>
+                </div>
+                <div class="card-body">
+                    <h2 class="mb-0" id="memory-usage">--%</h2>
+                    <p class="text-muted">Current Usage</p>
+                    <div id="memory-details">
+                        Used: <span id="memory-used">--</span> / <span id="memory-total">--</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Disk Summary Card -->
+        <div class="col-md-4">
+            <div class="metric-card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="fas fa-hdd me-2"></i>Disk</h5>
+                    <span id="disk-status" class="badge"></span>
+                </div>
+                <div class="card-body">
+                    <h2 class="mb-0" id="disk-usage">--%</h2>
+                    <p class="text-muted">Root Partition Usage</p>
+                    <div id="disk-details">
+                        Used: <span id="disk-used">--</span> / <span id="disk-total">--</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Detailed Metrics -->
+    {% include 'includes/metrics.html' %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Utility function to format bytes
+    function formatBytes(bytes, decimals = 2) {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const dm = decimals < 0 ? 0 : decimals;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+    }
+
+    // Function to update status badge
+    function updateStatusBadge(element, value) {
+        let className, text;
+        if (value >= 90) {
+            className = 'bg-danger';
+            text = 'Critical';
+        } else if (value >= 70) {
+            className = 'bg-warning';
+            text = 'Warning';
+        } else {
+            className = 'bg-success';
+            text = 'Healthy';
+        }
+        element.className = `badge ${className}`;
+        element.textContent = text;
+    }
+
+    // Function to update metrics
+    function updateMetrics(data) {
+        // Update CPU metrics
+        const cpuPercent = data.cpu.percent;
+        document.getElementById('cpu-usage').textContent = `${cpuPercent.toFixed(1)}%`;
+        document.getElementById('load-1').textContent = data.cpu.load_avg['1min'].toFixed(2);
+        document.getElementById('load-5').textContent = data.cpu.load_avg['5min'].toFixed(2);
+        document.getElementById('load-15').textContent = data.cpu.load_avg['15min'].toFixed(2);
+        updateStatusBadge(document.getElementById('cpu-status'), cpuPercent);
+
+        // Update Memory metrics
+        const memoryPercent = data.memory.virtual.percent;
+        document.getElementById('memory-usage').textContent = `${memoryPercent.toFixed(1)}%`;
+        document.getElementById('memory-used').textContent = formatBytes(data.memory.virtual.used);
+        document.getElementById('memory-total').textContent = formatBytes(data.memory.virtual.total);
+        updateStatusBadge(document.getElementById('memory-status'), memoryPercent);
+
+        // Update Disk metrics (root partition)
+        const rootPartition = data.disk.partitions['/'];
+        if (rootPartition) {
+            const diskPercent = rootPartition.percent;
+            document.getElementById('disk-usage').textContent = `${diskPercent.toFixed(1)}%`;
+            document.getElementById('disk-used').textContent = formatBytes(rootPartition.used);
+            document.getElementById('disk-total').textContent = formatBytes(rootPartition.total);
+            updateStatusBadge(document.getElementById('disk-status'), diskPercent);
+        }
+
+        // Update graphs
+        updateGraphs(data);
+    }
+</script>
+{% endblock %}
+

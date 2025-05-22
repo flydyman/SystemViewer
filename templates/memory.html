@@ -1,0 +1,329 @@
+{% extends "base.html" %}
+
+{% block title %}Memory Metrics | System Viewer{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <h1 class="mb-4"><i class="fas fa-memory me-2"></i>Memory Metrics</h1>
+    
+    <!-- Error Alert -->
+    <div id="error-alert" class="alert alert-danger d-none" role="alert">
+        <i class="fas fa-exclamation-triangle me-2"></i>
+        <span id="error-message">Error loading memory metrics</span>
+    </div>
+
+    <!-- Loading Indicator -->
+    <div id="loading-indicator" class="text-center mb-4">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        <p>Loading memory metrics...</p>
+    </div>
+
+    <!-- Memory Metrics Content (hidden until loaded) -->
+    <div id="metrics-content" class="d-none">
+        <!-- Memory Overview Cards -->
+        <div class="row mb-4">
+            <!-- Virtual Memory Card -->
+            <div class="col-md-6">
+                <div class="metric-card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">Virtual Memory</h5>
+                        <span id="memory-status" class="badge"></span>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6 text-center">
+                                <h2 id="memory-percent" class="mb-1">--%</h2>
+                                <p class="text-muted">Usage</p>
+                            </div>
+                            <div class="col-md-6">
+                                <table class="table table-sm">
+                                    <tr>
+                                        <th>Total:</th>
+                                        <td id="memory-total">--</td>
+                                    </tr>
+                                    <tr>
+                                        <th>Used:</th>
+                                        <td id="memory-used">--</td>
+                                    </tr>
+                                    <tr>
+                                        <th>Available:</th>
+                                        <td id="memory-available">--</td>
+                                    </tr>
+                                    <tr>
+                                        <th>Free:</th>
+                                        <td id="memory-free">--</td>
+                                    </tr>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Swap Memory Card -->
+            <div class="col-md-6">
+                <div class="metric-card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">Swap Memory</h5>
+                        <span id="swap-status" class="badge"></span>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6 text-center">
+                                <h2 id="swap-percent" class="mb-1">--%</h2>
+                                <p class="text-muted">Usage</p>
+                            </div>
+                            <div class="col-md-6">
+                                <table class="table table-sm">
+                                    <tr>
+                                        <th>Total:</th>
+                                        <td id="swap-total">--</td>
+                                    </tr>
+                                    <tr>
+                                        <th>Used:</th>
+                                        <td id="swap-used">--</td>
+                                    </tr>
+                                    <tr>
+                                        <th>Free:</th>
+                                        <td id="swap-free">--</td>
+                                    </tr>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Memory Usage History -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="metric-card">
+                    <div class="card-header">
+                        <h5 class="mb-0">Memory Usage History</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="memory-history-graph" style="height: 300px;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Memory Usage Breakdown -->
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <div class="metric-card">
+                    <div class="card-header">
+                        <h5 class="mb-0">Memory Usage Breakdown</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="memory-breakdown-graph" style="height: 300px;"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-6">
+                <div class="metric-card">
+                    <div class="card-header">
+                        <h5 class="mb-0">Memory Resources</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="memory-usage-info">
+                            <p>
+                                <strong>Virtual Memory:</strong> The total addressable memory space available to the system, 
+                                including both physical RAM and swap space.
+                            </p>
+                            <p>
+                                <strong>Available Memory:</strong> Memory that is immediately available for allocation to processes.
+                            </p>
+                            <p>
+                                <strong>Swap Memory:</strong> Disk space used as virtual memory when physical RAM is full. 
+                                High swap usage may indicate insufficient RAM for the workload.
+                            </p>
+                            <div class="alert alert-info mt-3">
+                                <i class="fas fa-info-circle me-2"></i>
+                                High memory usage isn't always a problem. Modern operating systems use 
+                                available memory for caching to improve performance.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Variables to store data
+    const timestamps = [];
+    const memoryData = [];
+    const swapData = [];
+    const maxDataPoints = 60;
+    
+    // Initialize graphs
+    let memoryHistoryGraph = null;
+    let memoryBreakdownGraph = null;
+    
+    // Function to format bytes
+    function formatBytes(bytes, decimals = 2) {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const dm = decimals < 0 ? 0 : decimals;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+    }
+    
+    // Function to format status class
+    function getStatusClass(value) {
+        if (value >= 90) return 'critical';
+        if (value >= 70) return 'warning';
+        return 'healthy';
+    }
+    
+    // Function to update status badge
+    function updateStatusBadge(element, value) {
+        let className, text;
+        if (value >= 90) {
+            className = 'bg-danger';
+            text = 'Critical';
+        } else if (value >= 70) {
+            className = 'bg-warning';
+            text = 'Warning';
+        } else {
+            className = 'bg-success';
+            text = 'Healthy';
+        }
+        element.className = `badge ${className}`;
+        element.textContent = text;
+    }
+    
+    // Initialize the graphs
+    function initializeGraphs() {
+        // Memory History Graph
+        memoryHistoryGraph = Plotly.newPlot('memory-history-graph', [
+            {
+                x: [],
+                y: [],
+                type: 'scatter',
+                name: 'RAM Usage',
+                line: { color: '#3498db' }
+            },
+            {
+                x: [],
+                y: [],
+                type: 'scatter',
+                name: 'Swap Usage',
+                line: { color: '#e74c3c', dash: 'dot' }
+            }
+        ], {
+            title: 'Memory Usage Over Time',
+            xaxis: { title: 'Time' },
+            yaxis: { title: 'Usage %', range: [0, 100] },
+            margin: { t: 30, b: 40, l: 60, r: 20 },
+            legend: { orientation: 'h', y: -0.2 }
+        });
+        
+        // Memory Breakdown Graph (initially empty, will be populated on data receipt)
+        memoryBreakdownGraph = Plotly.newPlot('memory-breakdown-graph', [], {
+            title: 'Memory Allocation',
+            margin: { t: 30, b: 40, l: 20, r: 20 },
+            showlegend: true
+        });
+    }
+    
+    // Update metrics with new data
+    function updateMetrics(data) {
+        // Hide loading indicator and show content
+        document.getElementById('loading-indicator').classList.add('d-none');
+        document.getElementById('metrics-content').classList.remove('d-none');
+        
+        // Get memory data
+        const virtualMemory = data.memory.virtual;
+        const swapMemory = data.memory.swap;
+        
+        // Update virtual memory metrics
+        document.getElementById('memory-percent').textContent = `${virtualMemory.percent.toFixed(1)}%`;
+        document.getElementById('memory-percent').className = getStatusClass(virtualMemory.percent);
+        document.getElementById('memory-total').textContent = formatBytes(virtualMemory.total);
+        document.getElementById('memory-used').textContent = formatBytes(virtualMemory.used);
+        document.getElementById('memory-available').textContent = formatBytes(virtualMemory.available);
+        document.getElementById('memory-free').textContent = formatBytes(virtualMemory.free);
+        updateStatusBadge(document.getElementById('memory-status'), virtualMemory.percent);
+        
+        // Update swap memory metrics
+        document.getElementById('swap-percent').textContent = `${swapMemory.percent.toFixed(1)}%`;
+        document.getElementById('swap-percent').className = getStatusClass(swapMemory.percent);
+        document.getElementById('swap-total').textContent = formatBytes(swapMemory.total);
+        document.getElementById('swap-used').textContent = formatBytes(swapMemory.used);
+        document.getElementById('swap-free').textContent = formatBytes(swapMemory.free);
+        updateStatusBadge(document.getElementById('swap-status'), swapMemory.percent);
+        
+        // Update memory history graph
+        const time = new Date().toLocaleTimeString();
+        timestamps.push(time);
+        memoryData.push(virtualMemory.percent);
+        swapData.push(swapMemory.percent);
+        
+        if (timestamps.length > maxDataPoints) {
+            timestamps.shift();
+            memoryData.shift();
+            swapData.shift();
+        }
+        
+        Plotly.update('memory-history-graph', {
+            x: [timestamps, timestamps],
+            y: [memoryData, swapData]
+        });
+        
+        // Update memory breakdown pie chart
+        const used = virtualMemory.used;
+        const cached = virtualMemory.total - virtualMemory.used - virtualMemory.free;
+        const free = virtualMemory.free;
+
+        var layout = {
+            title: 'Memory Allocation',
+            margin: { t: 30, b: 40, l: 20, r: 20 },
+            showlegend: true
+        };
+        
+        Plotly.newPlot('memory-breakdown-graph', {
+            data: [{
+                values: [used, cached, free],
+                labels: ['Used', 'Cached/Buffers', 'Free'],
+                type: 'pie',
+                textinfo: 'label+percent',
+                hoverinfo: 'label+value',
+                marker: {
+                    colors: ['#e74c3c', '#3498db', '#2ecc71']
+                }
+            }]
+        }, layout);
+    }
+    
+    // Handle errors
+    function showError(message) {
+        document.getElementById('loading-indicator').classList.add('d-none');
+        const errorAlert = document.getElementById('error-alert');
+        errorAlert.classList.remove('d-none');
+        document.getElementById('error-message').textContent = message;
+    }
+    
+    // Initialize page
+    document.addEventListener('DOMContentLoaded', function() {
+        try {
+            initializeGraphs();
+            
+            // If WebSocket is already defined in base.html, we just use the updateMetrics function
+            // Otherwise, we would set up a new WebSocket connection here
+        } catch (error) {
+            showError(`Failed to initialize graphs: ${error.message}`);
+        }
+    });
+</script>
+{% endblock %}
+

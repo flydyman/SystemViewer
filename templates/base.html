@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}System Viewer{% endblock %}</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Plotly.js for charts -->
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    
+    <!-- Custom CSS -->
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --secondary-color: #3498db;
+            --accent-color: #e74c3c;
+            --background-color: #f8f9fa;
+            --card-background: #ffffff;
+        }
+        
+        body {
+            background-color: var(--background-color);
+            font-family: Arial, sans-serif;
+            padding-top: 56px;
+        }
+        
+        .sidebar {
+            position: fixed;
+            top: 56px;
+            bottom: 0;
+            left: 0;
+            padding: 20px 0;
+            box-shadow: inset -1px 0 0 rgba(0, 0, 0, .1);
+            z-index: 100;
+            background-color: var(--primary-color);
+            color: white;
+        }
+        
+        .sidebar .nav-link {
+            color: rgba(255, 255, 255, .75);
+            padding: 0.75rem 1rem;
+            font-weight: 500;
+        }
+        
+        .sidebar .nav-link.active {
+            color: white;
+            background-color: rgba(255, 255, 255, .1);
+        }
+        
+        .sidebar .nav-link:hover {
+            color: white;
+        }
+        
+        .main-content {
+            margin-left: 200px;
+            padding: 20px;
+        }
+        
+        .metric-card {
+            background-color: var(--card-background);
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+            transition: transform 0.3s ease;
+        }
+        
+        .metric-card:hover {
+            transform: translateY(-5px);
+        }
+        
+        .metric-card .card-header {
+            background-color: var(--primary-color);
+            color: white;
+            border-radius: 10px 10px 0 0;
+            padding: 10px 15px;
+        }
+        
+        .critical {
+            color: var(--accent-color);
+        }
+        
+        .warning {
+            color: #f39c12;
+        }
+        
+        .healthy {
+            color: #2ecc71;
+        }
+        
+        .navbar-brand {
+            font-weight: bold;
+        }
+        
+        @media (max-width: 768px) {
+            .sidebar {
+                position: static;
+                height: auto;
+                width: 100%;
+                padding: 10px;
+            }
+            
+            .main-content {
+                margin-left: 0;
+                padding: 15px;
+            }
+        }
+    </style>
+    
+    {% block extra_head %}{% endblock %}
+</head>
+<body>
+    <!-- Navigation Bar -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark fixed-top">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="/">
+                <i class="fas fa-chart-line me-2"></i> 
+                System Viewer
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/" id="refresh-link">
+                            <i class="fas fa-sync-alt"></i> 
+                            <span id="auto-refresh-status">Auto-refresh ON</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/about">
+                            <i class="fas fa-info-circle"></i> About
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid">
+        <div class="row">
+            <!-- Sidebar -->
+            <nav class="col-md-2 d-md-block sidebar">
+                <div class="position-sticky">
+                    <ul class="nav flex-column">
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.url.path == '/' %}active{% endif %}" href="/">
+                                <i class="fas fa-tachometer-alt me-2"></i> Dashboard
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.url.path == '/cpu' %}active{% endif %}" href="/cpu">
+                                <i class="fas fa-microchip me-2"></i> CPU
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.url.path == '/memory' %}active{% endif %}" href="/memory">
+                                <i class="fas fa-memory me-2"></i> Memory
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.url.path == '/disk' %}active{% endif %}" href="/disk">
+                                <i class="fas fa-hdd me-2"></i> Disk
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </nav>
+
+            <!-- Main Content -->
+            <main class="col-md-10 ms-sm-auto main-content">
+                {% block content %}{% endblock %}
+            </main>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Common JavaScript -->
+    <script>
+        // WebSocket connection for real-time updates
+        let ws = null;
+        let autoRefresh = true;
+        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${wsProtocol}//${window.location.host}/ws`;
+        
+        function connectWebSocket() {
+            if (ws) {
+                console.log("Closing existing WebSocket connection");
+                ws.close();
+            }
+            
+            console.log("Connecting to WebSocket:", wsUrl);
+            ws = new WebSocket(wsUrl);
+            
+            ws.onopen = function() {
+                console.log("WebSocket connection established");
+            };
+            
+            ws.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+                if (typeof updateMetrics === 'function' && autoRefresh) {
+                    updateMetrics(data);
+                }
+            };
+            
+            ws.onclose = function() {
+                console.log("WebSocket connection closed");
+                setTimeout(connectWebSocket, 2000); // Try to reconnect after 2 seconds
+            };
+            
+            ws.onerror = function(error) {
+                console.error("WebSocket error:", error);
+                ws.close();
+            };
+        }
+        
+        // Toggle auto-refresh
+        document.getElementById('refresh-link').addEventListener('click', function(e) {
+            e.preventDefault();
+            autoRefresh = !autoRefresh;
+            document.getElementById('auto-refresh-status').textContent = 
+                autoRefresh ? 'Auto-refresh ON' : 'Auto-refresh OFF';
+        });
+        
+        // Connect to WebSocket when page loads
+        document.addEventListener('DOMContentLoaded', connectWebSocket);
+    </script>
+    
+    {% block scripts %}{% endblock %}
+</body>
+</html>
+

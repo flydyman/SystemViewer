@@ -1,0 +1,275 @@
+{% extends "base.html" %}
+
+{% block title %}CPU Metrics | System Viewer{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <h1 class="mb-4"><i class="fas fa-microchip me-2"></i>CPU Metrics</h1>
+    
+    <!-- Error Alert -->
+    <div id="error-alert" class="alert alert-danger d-none" role="alert">
+        <i class="fas fa-exclamation-triangle me-2"></i>
+        <span id="error-message">Error loading CPU metrics</span>
+    </div>
+
+    <!-- Loading Indicator -->
+    <div id="loading-indicator" class="text-center mb-4">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        <p>Loading CPU metrics...</p>
+    </div>
+
+    <!-- CPU Metrics Content (hidden until loaded) -->
+    <div id="metrics-content" class="d-none">
+        <!-- CPU Overview Card -->
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <div class="metric-card">
+                    <div class="card-header">
+                        <h5 class="mb-0">CPU Overview</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6 text-center">
+                                <h2 id="cpu-percent" class="mb-1">--%</h2>
+                                <p class="text-muted">Current Usage</p>
+                            </div>
+                            <div class="col-md-6">
+                                <table class="table table-sm">
+                                    <tr>
+                                        <th>Physical Cores:</th>
+                                        <td id="physical-cores">--</td>
+                                    </tr>
+                                    <tr>
+                                        <th>Logical Cores:</th>
+                                        <td id="logical-cores">--</td>
+                                    </tr>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-6">
+                <div class="metric-card">
+                    <div class="card-header">
+                        <h5 class="mb-0">Load Averages</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row text-center">
+                            <div class="col-md-4">
+                                <h3 id="load-1min">--</h3>
+                                <p class="text-muted">1 minute</p>
+                            </div>
+                            <div class="col-md-4">
+                                <h3 id="load-5min">--</h3>
+                                <p class="text-muted">5 minutes</p>
+                            </div>
+                            <div class="col-md-4">
+                                <h3 id="load-15min">--</h3>
+                                <p class="text-muted">15 minutes</p>
+                            </div>
+                        </div>
+                        <p class="text-muted mt-2 small">
+                            Load average represents the average system load over time. 
+                            Values above the number of CPU cores may indicate overload.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- CPU Usage History -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="metric-card">
+                    <div class="card-header">
+                        <h5 class="mb-0">CPU Usage History</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="cpu-history-graph" style="height: 300px;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Per-Core CPU Usage -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="metric-card">
+                    <div class="card-header">
+                        <h5 class="mb-0">Per-Core CPU Usage</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="cpu-cores-graph" style="height: 300px;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Variables to store data
+    const timestamps = [];
+    const cpuData = [];
+    const loadData = {
+        '1min': [],
+        '5min': [],
+        '15min': []
+    };
+    const maxDataPoints = 60;
+    
+    // Initialize graphs
+    let cpuHistoryGraph = null;
+    let cpuCoresGraph = null;
+    
+    // Function to format status class
+    function getStatusClass(value) {
+        if (value >= 90) return 'critical';
+        if (value >= 70) return 'warning';
+        return 'healthy';
+    }
+    
+    // Initialize the graphs
+    function initializeGraphs() {
+        // CPU History Graph
+        cpuHistoryGraph = Plotly.newPlot('cpu-history-graph', [
+            {
+                x: [],
+                y: [],
+                type: 'scatter',
+                name: 'CPU Usage',
+                line: { color: '#2ecc71' }
+            },
+            {
+                x: [],
+                y: [],
+                type: 'scatter',
+                name: 'Load Avg (1min)',
+                line: { color: '#3498db', dash: 'dot' },
+                yaxis: 'y2'
+            }
+        ], {
+            title: 'CPU Usage Over Time',
+            xaxis: { title: 'Time' },
+            yaxis: { 
+                title: 'CPU Usage %', 
+                range: [0, 100],
+                side: 'left'
+            },
+            yaxis2: {
+                title: 'Load Average',
+                titlefont: { color: '#3498db' },
+                tickfont: { color: '#3498db' },
+                overlaying: 'y',
+                side: 'right'
+            },
+            margin: { t: 30, b: 40, l: 60, r: 60 },
+            legend: { orientation: 'h', y: -0.2 }
+        });
+        
+        // Per-Core CPU Graph (initially empty, will be populated on data receipt)
+        cpuCoresGraph = Plotly.newPlot('cpu-cores-graph', [], {
+            title: 'Per-Core CPU Usage',
+            xaxis: { title: 'Cores' },
+            yaxis: { title: 'Usage %', range: [0, 100] },
+            margin: { t: 30, b: 40, l: 60, r: 20 },
+            barmode: 'group',
+            autosize: false,
+            showlegend: { orientation: 'h', y: -0.3}
+        });
+    }
+    
+    // Update metrics with new data
+    function updateMetrics(data) {
+        // Hide loading indicator and show content
+        document.getElementById('loading-indicator').classList.add('d-none');
+        document.getElementById('metrics-content').classList.remove('d-none');
+        
+        // Update CPU percentage
+        const cpuPercent = data.cpu.percent;
+        document.getElementById('cpu-percent').textContent = `${cpuPercent.toFixed(1)}%`;
+        document.getElementById('cpu-percent').className = getStatusClass(cpuPercent);
+        
+        // Update CPU core counts
+        document.getElementById('physical-cores').textContent = data.cpu.count.physical;
+        document.getElementById('logical-cores').textContent = data.cpu.count.logical;
+        
+        // Update load averages
+        document.getElementById('load-1min').textContent = data.cpu.load_avg['1min'].toFixed(2);
+        document.getElementById('load-5min').textContent = data.cpu.load_avg['5min'].toFixed(2);
+        document.getElementById('load-15min').textContent = data.cpu.load_avg['15min'].toFixed(2);
+        
+        // Update CPU history graph
+        const time = new Date().toLocaleTimeString();
+        timestamps.push(time);
+        cpuData.push(cpuPercent);
+        loadData['1min'].push(data.cpu.load_avg['1min']);
+        
+        if (timestamps.length > maxDataPoints) {
+            timestamps.shift();
+            cpuData.shift();
+            loadData['1min'].shift();
+        }
+        
+        Plotly.update('cpu-history-graph', {
+            x: [timestamps, timestamps],
+            y: [cpuData, loadData['1min']]
+        });
+        
+        // Update per-core CPU graph
+        const perCpuData = data.cpu.per_cpu_percent;
+        const coreLabels = Array.from({length: perCpuData.length}, (_, i) => `Core ${i}`);
+        
+        var trace1 = {
+                    x: coreLabels,
+                    y: perCpuData,
+                    type: 'bar',
+                    marker: {
+                        color: perCpuData.map(value => {
+                            if (value >= 90) return '#e74c3c';
+                            if (value >= 70) return '#f39c12';
+                            return '#2ecc71';
+                        })}
+        };
+
+        var barData = [trace1];
+        var layout = {
+            title: 'Per-Core CPU Usage',
+            xaxis: { title: 'Cores' },
+            yaxis: { title: 'Usage %', range: [0, 100] },
+            margin: { t: 30, b: 40, l: 60, r: 20 },
+            barmode: 'group',
+            showlegend: { orientation: 'h', y: -0.3}
+        };
+
+        Plotly.newPlot('cpu-cores-graph', barData, layout);
+    }
+    
+    // Handle errors
+    function showError(message) {
+        document.getElementById('loading-indicator').classList.add('d-none');
+        const errorAlert = document.getElementById('error-alert');
+        errorAlert.classList.remove('d-none');
+        document.getElementById('error-message').textContent = message;
+    }
+    
+    // Initialize page
+    document.addEventListener('DOMContentLoaded', function() {
+        try {
+            initializeGraphs();
+            
+            // If WebSocket is already defined in base.html, we just use the updateMetrics function
+            // Otherwise, we would set up a new WebSocket connection here
+        } catch (error) {
+            showError(`Failed to initialize graphs: ${error.message}`);
+        }
+    });
+</script>
+{% endblock %}
+

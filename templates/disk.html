@@ -1,0 +1,322 @@
+{% extends "base.html" %}
+
+{% block title %}Disk Metrics | System Viewer{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <h1 class="mb-4"><i class="fas fa-hdd me-2"></i>Disk Metrics</h1>
+    
+    <!-- Error Alert -->
+    <div id="error-alert" class="alert alert-danger d-none" role="alert">
+        <i class="fas fa-exclamation-triangle me-2"></i>
+        <span id="error-message">Error loading disk metrics</span>
+    </div>
+
+    <!-- Loading Indicator -->
+    <div id="loading-indicator" class="text-center mb-4">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        <p>Loading disk metrics...</p>
+    </div>
+
+    <!-- Disk Metrics Content (hidden until loaded) -->
+    <div id="metrics-content" class="d-none">
+        <!-- Disk Overview Card -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="metric-card">
+                    <div class="card-header">
+                        <h5 class="mb-0">Disk Usage Overview</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="disk-overview-graph" style="height: 300px;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Partitions Cards -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="metric-card">
+                    <div class="card-header">
+                        <h5 class="mb-0">Mounted Partitions</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Mount Point</th>
+                                        <th>Device</th>
+                                        <th>File System</th>
+                                        <th>Total</th>
+                                        <th>Used</th>
+                                        <th>Free</th>
+                                        <th>Usage</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="partitions-table">
+                                    <tr>
+                                        <td colspan="8" class="text-center">Loading partition data...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Detailed Partition Cards -->
+        <div id="detailed-partitions" class="row">
+            <!-- Partitions will be dynamically added here -->
+            <div class="col-12 text-center text-muted">
+                <p>Loading partition details...</p>
+            </div>
+        </div>
+        
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Variables to store data
+    let partitions = {};
+    const ioData = {};
+    
+    // Function to format bytes
+    function formatBytes(bytes, decimals = 2) {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const dm = decimals < 0 ? 0 : decimals;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+    }
+    
+    // Function to get status badge HTML
+    function getStatusBadge(value) {
+        let className, text;
+        if (value >= 90) {
+            className = 'bg-danger';
+            text = 'Critical';
+        } else if (value >= 70) {
+            className = 'bg-warning';
+            text = 'Warning';
+        } else {
+            className = 'bg-success';
+            text = 'Healthy';
+        }
+        return `<span class="badge ${className}">${text}</span>`;
+    }
+    
+    // Function to get progress bar HTML with appropriate color
+    function getProgressBar(value) {
+        let className;
+        if (value >= 90) {
+            className = 'bg-danger';
+        } else if (value >= 70) {
+            className = 'bg-warning';
+        } else {
+            className = 'bg-success';
+        }
+        
+        return `
+            <div class="progress" style="height: 20px;">
+                <div class="progress-bar ${className}" role="progressbar" style="width: ${value}%;" 
+                    aria-valuenow="${value}" aria-valuemin="0" aria-valuemax="100">${value.toFixed(1)}%</div>
+            </div>
+        `;
+    }
+    
+    // Initialize disk overview graph
+    function initializeDiskOverviewGraph() {
+        Plotly.newPlot('disk-overview-graph', [{
+            x: [],
+            y: [],
+            type: 'bar',
+            marker: {
+                color: []
+            }
+        }], {
+            title: 'Disk Usage by Partition',
+            xaxis: { title: 'Partition' },
+            yaxis: { title: 'Usage %', range: [0, 100] },
+            margin: { t: 30, b: 40, l: 60, r: 20 }
+        });
+    }
+    
+    // Create detailed card for each partition
+    function createPartitionCard(mountpoint, data) {
+        const detailedPartitions = document.getElementById('detailed-partitions');
+        
+        // Create placeholder for this partition if it doesn't exist
+        let partitionCard = document.getElementById(`partition-card-${mountpoint.replace(/\//g, '-')}`);
+        
+        if (!partitionCard) {
+            const cardHtml = `
+                <div class="col-md-6 mb-4">
+                    <div class="metric-card">
+                        <div class="card-header">
+                            <h5 class="mb-0">${mountpoint}</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row mb-3">
+                                <div class="col-md-4 text-center">
+                                    <div id="gauge-${mountpoint.replace(/\//g, '-')}" style="height: 150px;"></div>
+                                </div>
+                                <div class="col-md-8">
+                                    <table class="table table-sm">
+                                        <tr>
+                                            <th>Device:</th>
+                                            <td>${data.device}</td>
+                                        </tr>
+                                        <tr>
+                                            <th>File System:</th>
+                                            <td>${data.fstype}</td>
+                                        </tr>
+                                        <tr>
+                                            <th>Total:</th>
+                                            <td>${formatBytes(data.total)}</td>
+                                        </tr>
+                                        <tr>
+                                            <th>Used:</th>
+                                            <td>${formatBytes(data.used)} (${data.percent.toFixed(1)}%)</td>
+                                        </tr>
+                                        <tr>
+                                            <th>Free:</th>
+                                            <td>${formatBytes(data.free)}</td>
+                                        </tr>
+                                    </table>
+                                </div>
+                            </div>
+                            <div class="progress mt-2" style="height: 25px;">
+                                <div class="progress-bar ${data.percent >= 90 ? 'bg-danger' : data.percent >= 70 ? 'bg-warning' : 'bg-success'}" 
+                                    role="progressbar" style="width: ${data.percent}%;" 
+                                    aria-valuenow="${data.percent}" aria-valuemin="0" aria-valuemax="100">
+                                    ${data.percent.toFixed(1)}%
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // Add the new card to the container
+            const tempContainer = document.createElement('div');
+            tempContainer.innerHTML = cardHtml;
+            detailedPartitions.appendChild(tempContainer.firstElementChild);
+            
+            // Initialize gauge chart for this partition
+            Plotly.newPlot(`gauge-${mountpoint.replace(/\//g, '-')}`, [{
+                type: 'indicator',
+                mode: 'gauge+number',
+                value: data.percent,
+                title: { text: 'Usage', font: { size: 14 } },
+                gauge: {
+                    axis: { range: [null, 100] },
+                    bar: { color: data.percent >= 90 ? '#e74c3c' : data.percent >= 70 ? '#f39c12' : '#2ecc71' },
+                    bgcolor: 'white',
+                    borderwidth: 2,
+                    bordercolor: 'gray',
+                    steps: [
+                        { range: [0, 70], color: 'rgba(46, 204, 113, 0.3)' },
+                        { range: [70, 90], color: 'rgba(243, 156, 18, 0.3)' },
+                        { range: [90, 100], color: 'rgba(231, 76, 60, 0.3)' }
+                    ],
+                    threshold: {
+                        line: { color: 'red', width: 4 },
+                        thickness: 0.75,
+                        value: 90
+                    }
+                }
+            }], {
+                margin: { t: 0, b: 0, l: 0, r: 0 },
+                height: 150
+            });
+        } else {
+            // Update existing gauge
+            Plotly.update(`gauge-${mountpoint.replace(/\//g, '-')}`, {
+                value: [data.percent],
+                'gauge.bar.color': [data.percent >= 90 ? '#e74c3c' : data.percent >= 70 ? '#f39c12' : '#2ecc71']
+            });
+        }
+    }
+    
+    // Update the metrics with new data
+    function updateMetrics(data) {
+        // Hide loading indicator and show content
+        document.getElementById('loading-indicator').classList.add('d-none');
+        document.getElementById('metrics-content').classList.remove('d-none');
+        
+        // Clear any existing content in partitions container
+        const detailedPartitions = document.getElementById('detailed-partitions');
+        detailedPartitions.innerHTML = '';
+        
+        // Get partitions data
+        partitions = data.disk.partitions;
+        
+        // Update partitions table
+        let tableHtml = '';
+        const mountpoints = [];
+        const usageValues = [];
+        const barColors = [];
+        
+        for (const [mountpoint, info] of Object.entries(partitions)) {
+            // Add to table data
+            tableHtml += `
+                <tr>
+                    <td>${mountpoint}</td>
+                    <td>${info.device}</td>
+                    <td>${info.fstype}</td>
+                    <td>${formatBytes(info.total)}</td>
+                    <td>${formatBytes(info.used)}</td>
+                    <td>${formatBytes(info.free)}</td>
+                    <td>${getProgressBar(info.percent)}</td>
+                    <td>${getStatusBadge(info.percent)}</td>
+                </tr>
+            `;
+            
+            // Create detailed card for this partition
+            createPartitionCard(mountpoint, info);
+            
+            // Add to overview graph data
+            mountpoints.push(mountpoint);
+            usageValues.push(info.percent);
+            barColors.push(info.percent >= 90 ? '#e74c3c' : info.percent >= 70 ? '#f39c12' : '#2ecc71');
+        }
+        
+        // Update partitions table
+        document.getElementById('partitions-table').innerHTML = tableHtml;
+        
+        // Update disk overview graph
+        Plotly.update('disk-overview-graph', {
+            x: [mountpoints],
+            y: [usageValues],
+            'marker.color': [barColors]
+        });
+    }
+    
+    
+    // Handle errors
+    function showError(message) {
+        document.getElementById('loading-indicator').classList.add('d-none');
+        const errorAlert = document.getElementById('error-alert');
+        errorAlert.classList.remove('d-none');
+        document.getElementById('error-message').textContent = message;
+    }
+    
+    // Initialize page
+    document.addEventListener('DOMContentLoaded', function() {
+        try {
+            initializeDiskOverviewGraph();
+        } catch (error) {
+            showError(`Failed to initialize graphs: ${error.message}`);
+        }
+    });
+</script>
+{% endblock %}

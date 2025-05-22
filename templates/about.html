@@ -1,0 +1,202 @@
+{% extends "base.html" %}
+
+{% block title %}About | System Viewer{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="metric-card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>About System Viewer</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3 text-center mb-4">
+                            <i class="fas fa-chart-line" style="font-size: 72px; color: #3498db;"></i>
+                            <h2 class="mt-3">System Viewer</h2>
+                            <p class="text-muted">Version 1.0.0</p>
+                        </div>
+                        <div class="col-md-9">
+                            <p class="lead">
+                                System Viewer is a real-time system monitoring application that provides comprehensive 
+                                insights into your system's performance metrics.
+                            </p>
+                            <p>
+                                This web-based application allows you to monitor CPU usage, memory consumption, 
+                                and disk utilization from any device with a web browser. The real-time updates 
+                                and historical tracking help identify performance trends and potential issues.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="metric-card h-100">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-list-check me-2"></i>Features</h5>
+                </div>
+                <div class="card-body">
+                    <ul class="list-group list-group-flush">
+                        <li class="list-group-item">
+                            <i class="fas fa-microchip me-2 text-primary"></i>
+                            <strong>CPU Monitoring:</strong> Track CPU usage percentage, load averages, and per-core usage
+                        </li>
+                        <li class="list-group-item">
+                            <i class="fas fa-memory me-2 text-success"></i>
+                            <strong>Memory Tracking:</strong> Monitor RAM usage, available memory, and swap utilization
+                        </li>
+                        <li class="list-group-item">
+                            <i class="fas fa-hdd me-2 text-danger"></i>
+                            <strong>Disk Analysis:</strong> Track disk usage across all partitions and I/O statistics
+                        </li>
+                        <li class="list-group-item">
+                            <i class="fas fa-chart-area me-2 text-info"></i>
+                            <strong>Historical Data:</strong> View performance trends with historical graphs
+                        </li>
+                        <li class="list-group-item">
+                            <i class="fas fa-bolt me-2 text-warning"></i>
+                            <strong>Real-time Updates:</strong> All metrics update automatically via WebSockets
+                        </li>
+                        <li class="list-group-item">
+                            <i class="fas fa-mobile-alt me-2 text-secondary"></i>
+                            <strong>Responsive Design:</strong> Optimized for both desktop and mobile devices
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="metric-card h-100">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-book me-2"></i>Usage Instructions</h5>
+                </div>
+                <div class="card-body">
+                    <h6 class="mb-3">Getting Started</h6>
+                    <p>
+                        Navigate through the system metrics using the sidebar menu. Each page provides detailed 
+                        information about different aspects of your system:
+                    </p>
+                    <ul>
+                        <li><strong>Dashboard:</strong> Overview of all system metrics</li>
+                        <li><strong>CPU:</strong> Detailed CPU usage statistics and graphs</li>
+                        <li><strong>Memory:</strong> RAM and swap memory usage details</li>
+                        <li><strong>Disk:</strong> Storage usage for all partitions and I/O statistics</li>
+                    </ul>
+                    
+                    <h6 class="mt-4 mb-3">Auto-Refresh</h6>
+                    <p>
+                        All metrics automatically refresh every 5 seconds. You can toggle auto-refresh 
+                        by clicking the "Auto-refresh" button in the navigation bar.
+                    </p>
+                    
+                    <h6 class="mt-4 mb-3">Reading the Graphs</h6>
+                    <p>
+                        <i class="fas fa-circle text-success me-2"></i>Green indicators show healthy system state<br>
+                        <i class="fas fa-circle text-warning me-2"></i>Yellow/orange indicators show moderate load<br>
+                        <i class="fas fa-circle text-danger me-2"></i>Red indicators show high/critical system load
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="metric-card h-100">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-cogs me-2"></i>Technical Details</h5>
+                </div>
+                <div class="card-body">
+                    <table class="table">
+                        <tbody>
+                            <tr>
+                                <th scope="row">Backend Framework</th>
+                                <td>FastAPI (Python)</td>
+                            </tr>
+                            <tr>
+                                <th scope="row">Frontend</th>
+                                <td>HTML, CSS, JavaScript, Bootstrap 5</td>
+                            </tr>
+                            <tr>
+                                <th scope="row">Visualization</th>
+                                <td>Plotly.js</td>
+                            </tr>
+                            <tr>
+                                <th scope="row">Real-time Updates</th>
+                                <td>WebSockets</td>
+                            </tr>
+                            <tr>
+                                <th scope="row">System Metrics</th>
+                                <td>psutil (Python library)</td>
+                            </tr>
+                            <tr>
+                                <th scope="row">Target Environment</th>
+                                <td>Linux/Unix systems (Debian-based)</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <div class="mt-3">
+                        <h6>Required Dependencies:</h6>
+                        <ul>
+                            <li>Python 3.11+</li>
+                            <li>FastAPI</li>
+                            <li>Uvicorn</li>
+                            <li>psutil</li>
+                            <li>Jinja2</li>
+                            <li>WebSockets</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="metric-card h-100">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-life-ring me-2"></i>Support & Contact</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-4">
+                        <h6>Project Repository</h6>
+                        <p>
+                            <a href="https://github.com/username/system-viewer" target="_blank">
+                                <i class="fab fa-github me-2"></i>github.com/username/system-viewer
+                            </a>
+                        </p>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <h6>Reporting Issues</h6>
+                        <p>
+                            If you encounter any problems or have feature requests, please open an issue 
+                            on the GitHub repository or contact the developer directly.
+                        </p>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <h6>License</h6>
+                        <p>
+                            System Viewer is open-source software released under the MIT License.
+                            You are free to use, modify, and distribute this software according to the terms of the license.
+                        </p>
+                    </div>
+                    
+                    <div class="alert alert-info">
+                        <i class="fas fa-code me-2"></i>
+                        <strong>Contribute:</strong> We welcome contributions to improve System Viewer!
+                        Fork the repository and submit pull requests to help enhance this tool.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+

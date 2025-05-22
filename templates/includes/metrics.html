@@ -1,0 +1,145 @@
+<!-- Detailed Metrics Graphs -->
+<div class="row">
+    <!-- CPU Graph -->
+    <div class="col-12 mb-4">
+        <div class="metric-card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-microchip me-2"></i>CPU Usage History</h5>
+            </div>
+            <div class="card-body">
+                <div id="cpu-graph" style="height: 300px;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Memory Graph -->
+    <div class="col-12 mb-4">
+        <div class="metric-card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-memory me-2"></i>Memory Usage History</h5>
+            </div>
+            <div class="card-body">
+                <div id="memory-graph" style="height: 300px;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Disk Usage Graph -->
+    <div class="col-12 mb-4">
+        <div class="metric-card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-hdd me-2"></i>Disk Usage</h5>
+            </div>
+            <div class="card-body">
+                <div id="disk-graph" style="height: 300px;"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Initialize graphs
+    let cpuGraph = null;
+    let memoryGraph = null;
+    let diskGraph = null;
+    const maxDataPoints = 60; // 5 minutes of data at 5-second intervals
+    
+    // Data arrays for graphs
+    const timestamps = [];
+    const cpuData = [];
+    const memoryData = [];
+    const diskData = {};
+
+    function initializeGraphs() {
+        // CPU Graph
+        cpuGraph = Plotly.newPlot('cpu-graph', [{
+            x: [],
+            y: [],
+            type: 'scatter',
+            name: 'CPU Usage',
+            line: { color: '#2ecc71' }
+        }], {
+            title: 'CPU Usage Over Time',
+            xaxis: { title: 'Time' },
+            yaxis: { title: 'Usage %', range: [0, 100] },
+            margin: { t: 30, b: 40, l: 60, r: 20 },
+            showlegend: false
+        });
+
+        // Memory Graph
+        memoryGraph = Plotly.newPlot('memory-graph', [{
+            x: [],
+            y: [],
+            type: 'scatter',
+            name: 'Memory Usage',
+            line: { color: '#3498db' }
+        }], {
+            title: 'Memory Usage Over Time',
+            xaxis: { title: 'Time' },
+            yaxis: { title: 'Usage %', range: [0, 100] },
+            margin: { t: 30, b: 40, l: 60, r: 20 },
+            showlegend: false
+        });
+
+        // Disk Graph (Bar chart)
+        diskGraph = Plotly.newPlot('disk-graph', [{
+            x: [],
+            y: [],
+            type: 'bar',
+            name: 'Disk Usage',
+            marker: { color: '#e74c3c' }
+        }], {
+            title: 'Disk Usage by Partition',
+            xaxis: { title: 'Partition' },
+            yaxis: { title: 'Usage %', range: [0, 100] },
+            margin: { t: 30, b: 80, l: 60, r: 20 },
+            showlegend: false
+        });
+    }
+
+    function updateGraphs(data) {
+        const time = new Date().toLocaleTimeString();
+        
+        // Update CPU graph
+        timestamps.push(time);
+        cpuData.push(data.cpu.percent);
+        if (timestamps.length > maxDataPoints) {
+            timestamps.shift();
+            cpuData.shift();
+        }
+        
+        Plotly.update('cpu-graph', {
+            x: [timestamps],
+            y: [cpuData]
+        });
+
+        // Update Memory graph
+        memoryData.push(data.memory.virtual.percent);
+        if (memoryData.length > maxDataPoints) {
+            memoryData.shift();
+        }
+        
+        Plotly.update('memory-graph', {
+            x: [timestamps],
+            y: [memoryData]
+        });
+
+        // Update Disk graph (bar chart)
+        const partitions = [];
+        const usageData = [];
+        
+        for (const [mount, info] of Object.entries(data.disk.partitions)) {
+            partitions.push(mount);
+            usageData.push(info.percent);
+        }
+        
+        Plotly.update('disk-graph', {
+            x: [partitions],
+            y: [usageData]
+        });
+    }
+
+    // Initialize graphs when page loads
+    document.addEventListener('DOMContentLoaded', initializeGraphs);
+</script>
+
