@@ -41,7 +41,6 @@ app.add_middleware(
 
 # Configure templates and static files
 templates = Jinja2Templates(directory="templates")
-app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # Initialize metrics collector
 metrics_collector = MetricsCollector()
